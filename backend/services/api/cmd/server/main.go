@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,22 +13,28 @@ import (
 
 	"github.com/IudaIzzKareotta/MigrantHub/backend/pkg/logger"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server"
+	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server/config"
 )
 
 func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+		os.Exit(1)
+	}
+
 	log := logger.New(logger.Config{
-		// Environment: os.Getenv("APP_ENV"),
-		Environment: "dev",
+		Environment: cfg.App.Environment,
 	})
 
-	srv := server.New(log)
+	srv := server.New(log, cfg.HTTP)
 
 	srvErr := make(chan error, 1)
 
 	go func() {
 		log.Info("starting HTTP server",
 			slog.String("service", "api"),
-			slog.String("addr", ":8080"),
+			slog.String("addr", cfg.HTTP.Addr()),
 		)
 
 		if err := srv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -4,13 +4,15 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server/config"
 )
 
 type Server struct {
 	httpServer *http.Server
 }
 
-func New(log *slog.Logger) *Server {
+func New(log *slog.Logger, cfg config.HTTPConfig) *Server {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(
@@ -23,8 +25,12 @@ func New(log *slog.Logger) *Server {
 
 	return &Server{
 		httpServer: &http.Server{
-			Addr:    ":8080",
-			Handler: RequestLogger(log)(mux),
+			Addr:              cfg.Addr(),
+			Handler:           RequestLogger(log)(mux),
+			ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+			ReadTimeout:       cfg.ReadTimeout,
+			WriteTimeout:      cfg.WriteTimeout,
+			IdleTimeout:       cfg.IdleTimeout,
 		},
 	}
 }
