@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -78,7 +79,7 @@ func TestUserRepositoryCreateAndGetByID(t *testing.T) {
 	if got.DisplayName != u.DisplayName {
 		t.Errorf("DisplayName = %q, want %q", got.DisplayName, u.DisplayName)
 	}
-	if !got.CreatedAt.Equal(u.CreatedAt) {
+	if !got.CreatedAt.Equal(u.CreatedAt.Truncate(time.Microsecond)) {
 		t.Errorf("CreatedAt = %v, want %v", got.CreatedAt, u.CreatedAt)
 	}
 }
