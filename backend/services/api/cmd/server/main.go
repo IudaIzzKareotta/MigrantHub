@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/IudaIzzKareotta/MigrantHub/backend/pkg/logger"
+	userapp "github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/application/user"
+	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/infrastructure/postgres"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server/config"
 )
@@ -27,7 +29,20 @@ func main() {
 		Environment: cfg.App.Environment,
 	})
 
-	srv := server.New(log, cfg.HTTP)
+	pool, err := postgres.NewPool(context.Background(), cfg.DB)
+	if err != nil {
+		log.Error("connect to database failed",
+			slog.Any("error", err),
+		)
+
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	userRepo := postgres.NewUserRepository(pool)
+	userService := userapp.NewService(userRepo)
+
+	srv := server.New(log, cfg.HTTP, pool, userService)
 
 	srvErr := make(chan error, 1)
 

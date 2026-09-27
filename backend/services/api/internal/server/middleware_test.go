@@ -127,7 +127,7 @@ func TestRequestLoggerPassesThroughRequestAndResponse(t *testing.T) {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"id":1}`))
+			_, _ = w.Write([]byte(`{"id":1}`))
 		}))
 
 	rec := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestRequestLoggerLogsRequestFields(t *testing.T) {
 			method: http.MethodGet,
 			target: "/health",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte(`{"status":"ok"}`))
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
 			},
 			wantStatus: http.StatusOK,
 		},

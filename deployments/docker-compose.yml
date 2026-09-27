@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: imresamu/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-migranthub}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-migranthub}
+      POSTGRES_DB: ${DB_NAME:-migranthub}
+    ports:
+      - "${DB_HOST_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-migranthub} -d ${DB_NAME:-migranthub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

@@ -33,6 +33,36 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.HTTP.IdleTimeout != 60*time.Second {
 		t.Errorf("IdleTimeout = %v, want %v", cfg.HTTP.IdleTimeout, 60*time.Second)
 	}
+	if cfg.DB.Host != "localhost" {
+		t.Errorf("DB.Host = %q, want %q", cfg.DB.Host, "localhost")
+	}
+	if cfg.DB.Port != "5432" {
+		t.Errorf("DB.Port = %q, want %q", cfg.DB.Port, "5432")
+	}
+	if cfg.DB.User != "migranthub" {
+		t.Errorf("DB.User = %q, want %q", cfg.DB.User, "migranthub")
+	}
+	if cfg.DB.Name != "migranthub" {
+		t.Errorf("DB.Name = %q, want %q", cfg.DB.Name, "migranthub")
+	}
+	if cfg.DB.SSLMode != "disable" {
+		t.Errorf("DB.SSLMode = %q, want %q", cfg.DB.SSLMode, "disable")
+	}
+	if cfg.DB.MaxConns != 10 {
+		t.Errorf("DB.MaxConns = %d, want %d", cfg.DB.MaxConns, 10)
+	}
+	if cfg.DB.MinConns != 2 {
+		t.Errorf("DB.MinConns = %d, want %d", cfg.DB.MinConns, 2)
+	}
+	if cfg.DB.MaxConnLifetime != 30*time.Minute {
+		t.Errorf("DB.MaxConnLifetime = %v, want %v", cfg.DB.MaxConnLifetime, 30*time.Minute)
+	}
+	if cfg.DB.MaxConnIdleTime != 5*time.Minute {
+		t.Errorf("DB.MaxConnIdleTime = %v, want %v", cfg.DB.MaxConnIdleTime, 5*time.Minute)
+	}
+	if cfg.DB.ConnectTimeout != 5*time.Second {
+		t.Errorf("DB.ConnectTimeout = %v, want %v", cfg.DB.ConnectTimeout, 5*time.Second)
+	}
 }
 
 func TestLoadEnvOverrides(t *testing.T) {
@@ -43,6 +73,17 @@ func TestLoadEnvOverrides(t *testing.T) {
 	t.Setenv("HTTP_READ_TIMEOUT", "2s")
 	t.Setenv("HTTP_WRITE_TIMEOUT", "3s")
 	t.Setenv("HTTP_IDLE_TIMEOUT", "4s")
+	t.Setenv("DB_HOST", "db.internal")
+	t.Setenv("DB_PORT", "6543")
+	t.Setenv("DB_USER", "app")
+	t.Setenv("DB_PASSWORD", "secret")
+	t.Setenv("DB_NAME", "migranthub_test")
+	t.Setenv("DB_SSLMODE", "require")
+	t.Setenv("DB_MAX_CONNS", "20")
+	t.Setenv("DB_MIN_CONNS", "5")
+	t.Setenv("DB_MAX_CONN_LIFETIME", "1h")
+	t.Setenv("DB_MAX_CONN_IDLE_TIME", "10m")
+	t.Setenv("DB_CONNECT_TIMEOUT", "2s")
 
 	cfg, err := Load()
 	if err != nil {
@@ -69,6 +110,39 @@ func TestLoadEnvOverrides(t *testing.T) {
 	}
 	if cfg.HTTP.IdleTimeout != 4*time.Second {
 		t.Errorf("IdleTimeout = %v, want %v", cfg.HTTP.IdleTimeout, 4*time.Second)
+	}
+	if cfg.DB.Host != "db.internal" {
+		t.Errorf("DB.Host = %q, want %q", cfg.DB.Host, "db.internal")
+	}
+	if cfg.DB.Port != "6543" {
+		t.Errorf("DB.Port = %q, want %q", cfg.DB.Port, "6543")
+	}
+	if cfg.DB.User != "app" {
+		t.Errorf("DB.User = %q, want %q", cfg.DB.User, "app")
+	}
+	if cfg.DB.Password != "secret" {
+		t.Errorf("DB.Password = %q, want %q", cfg.DB.Password, "secret")
+	}
+	if cfg.DB.Name != "migranthub_test" {
+		t.Errorf("DB.Name = %q, want %q", cfg.DB.Name, "migranthub_test")
+	}
+	if cfg.DB.SSLMode != "require" {
+		t.Errorf("DB.SSLMode = %q, want %q", cfg.DB.SSLMode, "require")
+	}
+	if cfg.DB.MaxConns != 20 {
+		t.Errorf("DB.MaxConns = %d, want %d", cfg.DB.MaxConns, 20)
+	}
+	if cfg.DB.MinConns != 5 {
+		t.Errorf("DB.MinConns = %d, want %d", cfg.DB.MinConns, 5)
+	}
+	if cfg.DB.MaxConnLifetime != 1*time.Hour {
+		t.Errorf("DB.MaxConnLifetime = %v, want %v", cfg.DB.MaxConnLifetime, 1*time.Hour)
+	}
+	if cfg.DB.MaxConnIdleTime != 10*time.Minute {
+		t.Errorf("DB.MaxConnIdleTime = %v, want %v", cfg.DB.MaxConnIdleTime, 10*time.Minute)
+	}
+	if cfg.DB.ConnectTimeout != 2*time.Second {
+		t.Errorf("DB.ConnectTimeout = %v, want %v", cfg.DB.ConnectTimeout, 2*time.Second)
 	}
 }
 
@@ -108,11 +182,39 @@ func TestLoadInvalidPort(t *testing.T) {
 	}
 }
 
+func TestLoadInvalidMaxConns(t *testing.T) {
+	t.Setenv("DB_MAX_CONNS", "not-a-number")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "DB_MAX_CONNS") {
+		t.Errorf("Load() error = %v, want mention of DB_MAX_CONNS", err)
+	}
+}
+
 func TestHTTPConfigAddr(t *testing.T) {
 	cfg := HTTPConfig{Host: "0.0.0.0", Port: "8080"}
 
 	if got, want := cfg.Addr(), "0.0.0.0:8080"; got != want {
 		t.Errorf("Addr() = %q, want %q", got, want)
+	}
+}
+
+func TestDBConfigDSN(t *testing.T) {
+	cfg := DBConfig{
+		Host:     "localhost",
+		Port:     "5432",
+		User:     "app",
+		Password: "p@ss/word",
+		Name:     "migranthub",
+		SSLMode:  "disable",
+	}
+
+	want := "postgres://app:p%40ss%2Fword@localhost:5432/migranthub?sslmode=disable"
+	if got := cfg.DSN(); got != want {
+		t.Errorf("DSN() = %q, want %q", got, want)
 	}
 }
 
@@ -127,6 +229,19 @@ func TestConfigValidate(t *testing.T) {
 				ReadTimeout:       10 * time.Second,
 				WriteTimeout:      10 * time.Second,
 				IdleTimeout:       60 * time.Second,
+			},
+			DB: DBConfig{
+				Host:            "localhost",
+				Port:            "5432",
+				User:            "migranthub",
+				Password:        "migranthub",
+				Name:            "migranthub",
+				SSLMode:         "disable",
+				MaxConns:        10,
+				MinConns:        2,
+				MaxConnLifetime: 30 * time.Minute,
+				MaxConnIdleTime: 5 * time.Minute,
+				ConnectTimeout:  5 * time.Second,
 			},
 		}
 	}
@@ -170,6 +285,51 @@ func TestConfigValidate(t *testing.T) {
 			name:    "negative idle timeout",
 			mutate:  func(c *Config) { c.HTTP.IdleTimeout = -1 * time.Second },
 			wantErr: "HTTP_IDLE_TIMEOUT",
+		},
+		{
+			name:    "empty db host",
+			mutate:  func(c *Config) { c.DB.Host = "" },
+			wantErr: "DB_HOST",
+		},
+		{
+			name:    "invalid db port",
+			mutate:  func(c *Config) { c.DB.Port = "70000" },
+			wantErr: "DB_PORT",
+		},
+		{
+			name:    "empty db user",
+			mutate:  func(c *Config) { c.DB.User = "" },
+			wantErr: "DB_USER",
+		},
+		{
+			name:    "empty db name",
+			mutate:  func(c *Config) { c.DB.Name = "" },
+			wantErr: "DB_NAME",
+		},
+		{
+			name:    "invalid sslmode",
+			mutate:  func(c *Config) { c.DB.SSLMode = "yes-please" },
+			wantErr: "DB_SSLMODE",
+		},
+		{
+			name:    "zero max conns",
+			mutate:  func(c *Config) { c.DB.MaxConns = 0 },
+			wantErr: "DB_MAX_CONNS",
+		},
+		{
+			name:    "min conns greater than max conns",
+			mutate:  func(c *Config) { c.DB.MinConns = c.DB.MaxConns + 1 },
+			wantErr: "DB_MIN_CONNS",
+		},
+		{
+			name:    "zero max conn lifetime",
+			mutate:  func(c *Config) { c.DB.MaxConnLifetime = 0 },
+			wantErr: "DB_MAX_CONN_LIFETIME",
+		},
+		{
+			name:    "zero connect timeout",
+			mutate:  func(c *Config) { c.DB.ConnectTimeout = 0 },
+			wantErr: "DB_CONNECT_TIMEOUT",
 		},
 	}
 
