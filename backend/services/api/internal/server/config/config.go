@@ -15,6 +15,7 @@ type Config struct {
 	App  AppConfig
 	HTTP HTTPConfig
 	DB   DBConfig
+	Auth AuthConfig
 }
 
 type AppConfig struct {
@@ -63,6 +64,17 @@ func (c DBConfig) DSN() string {
 	return u.String()
 }
 
+type AuthConfig struct {
+	JWTSecret       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+}
+
+const (
+	minJWTSecretLength = 32
+	devJWTSecret       = "dev-only-insecure-secret-please-change-in-production"
+)
+
 var validEnvironments = map[string]bool{
 	"dev":        true,
 	"staging":    true,
@@ -105,6 +117,10 @@ func Load() (*Config, error) {
 	v.SetDefault("DB_MAX_CONN_IDLE_TIME", "5m")
 	v.SetDefault("DB_CONNECT_TIMEOUT", "5s")
 
+	v.SetDefault("AUTH_JWT_SECRET", devJWTSecret)
+	v.SetDefault("AUTH_ACCESS_TOKEN_TTL", "15m")
+	v.SetDefault("AUTH_REFRESH_TOKEN_TTL", "720h")
+
 	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err != nil {
@@ -128,6 +144,9 @@ func Load() (*Config, error) {
 			Password: v.GetString("DB_PASSWORD"),
 			Name:     v.GetString("DB_NAME"),
 			SSLMode:  v.GetString("DB_SSLMODE"),
+		},
+		Auth: AuthConfig{
+			JWTSecret: v.GetString("AUTH_JWT_SECRET"),
 		},
 	}
 
@@ -165,6 +184,13 @@ func Load() (*Config, error) {
 	}
 	if cfg.DB.ConnectTimeout, err = time.ParseDuration(v.GetString("DB_CONNECT_TIMEOUT")); err != nil {
 		return nil, fmt.Errorf("parse DB_CONNECT_TIMEOUT: %w", err)
+	}
+
+	if cfg.Auth.AccessTokenTTL, err = time.ParseDuration(v.GetString("AUTH_ACCESS_TOKEN_TTL")); err != nil {
+		return nil, fmt.Errorf("parse AUTH_ACCESS_TOKEN_TTL: %w", err)
+	}
+	if cfg.Auth.RefreshTokenTTL, err = time.ParseDuration(v.GetString("AUTH_REFRESH_TOKEN_TTL")); err != nil {
+		return nil, fmt.Errorf("parse AUTH_REFRESH_TOKEN_TTL: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -232,6 +258,19 @@ func (c *Config) Validate() error {
 		if d <= 0 {
 			return fmt.Errorf("%s: must be greater than zero", name)
 		}
+	}
+
+	if len(c.Auth.JWTSecret) < minJWTSecretLength {
+		return fmt.Errorf("AUTH_JWT_SECRET: must be at least %d characters", minJWTSecretLength)
+	}
+	if c.App.Environment == "production" && c.Auth.JWTSecret == devJWTSecret {
+		return errors.New("AUTH_JWT_SECRET: must not use the default development secret in production")
+	}
+	if c.Auth.AccessTokenTTL <= 0 {
+		return errors.New("AUTH_ACCESS_TOKEN_TTL: must be greater than zero")
+	}
+	if c.Auth.RefreshTokenTTL <= c.Auth.AccessTokenTTL {
+		return errors.New("AUTH_REFRESH_TOKEN_TTL: must be greater than AUTH_ACCESS_TOKEN_TTL")
 	}
 
 	return nil

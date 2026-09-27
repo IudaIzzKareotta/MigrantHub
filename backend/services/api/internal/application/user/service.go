@@ -17,6 +17,7 @@ var (
 type Repository interface {
 	Create(ctx context.Context, u *domainuser.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domainuser.User, error)
+	GetByEmail(ctx context.Context, email string) (*domainuser.User, error)
 }
 
 type Service struct {
@@ -42,4 +43,8 @@ func (s *Service) Register(ctx context.Context, email, displayName string) (*dom
 
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*domainuser.User, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *Service) GetByEmail(ctx context.Context, email string) (*domainuser.User, error) {
+	return s.repo.GetByEmail(ctx, domainuser.NormalizeEmail(email))
 }

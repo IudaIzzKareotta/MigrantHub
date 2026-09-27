@@ -12,8 +12,11 @@ import (
 	"time"
 
 	"github.com/IudaIzzKareotta/MigrantHub/backend/pkg/logger"
+	authapp "github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/application/auth"
 	userapp "github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/application/user"
+	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/infrastructure/jwtauth"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/infrastructure/postgres"
+	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/infrastructure/security"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server"
 	"github.com/IudaIzzKareotta/MigrantHub/backend/services/api/internal/server/config"
 )
@@ -42,7 +45,23 @@ func main() {
 	userRepo := postgres.NewUserRepository(pool)
 	userService := userapp.NewService(userRepo)
 
-	srv := server.New(log, cfg.HTTP, pool, userService)
+	transactor := postgres.NewTransactor(pool)
+	credentialsRepo := postgres.NewCredentialsRepository(pool)
+	refreshTokenRepo := postgres.NewRefreshTokenRepository(pool)
+	hasher := security.NewArgon2idHasher()
+	tokenIssuer := jwtauth.NewIssuer(cfg.Auth.JWTSecret, cfg.Auth.AccessTokenTTL)
+
+	authService := authapp.NewService(
+		userService,
+		credentialsRepo,
+		refreshTokenRepo,
+		hasher,
+		tokenIssuer,
+		transactor,
+		cfg.Auth.RefreshTokenTTL,
+	)
+
+	srv := server.New(log, cfg.HTTP, pool, userService, authService, tokenIssuer)
 
 	srvErr := make(chan error, 1)
 

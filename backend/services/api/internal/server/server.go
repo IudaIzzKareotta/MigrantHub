@@ -18,7 +18,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func New(log *slog.Logger, cfg config.HTTPConfig, db Pinger, userService UserService) *Server {
+func New(log *slog.Logger, cfg config.HTTPConfig, db Pinger, userService UserService, authService AuthService, tokenVerifier TokenVerifier) *Server {
 	r := chi.NewRouter()
 	r.Use(RequestLogger(log))
 
@@ -38,6 +38,19 @@ func New(log *slog.Logger, cfg config.HTTPConfig, db Pinger, userService UserSer
 	r.Route("/users", func(r chi.Router) {
 		r.Post("/", users.create)
 		r.Get("/{id}", users.getByID)
+	})
+
+	authH := &authHandler{log: log, service: authService, userService: userService}
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/register", authH.register)
+		r.Post("/login", authH.login)
+		r.Post("/refresh", authH.refresh)
+		r.Post("/logout", authH.logout)
+
+		r.Group(func(r chi.Router) {
+			r.Use(RequireAuth(tokenVerifier))
+			r.Get("/me", authH.me)
+		})
 	})
 
 	return &Server{

@@ -63,6 +63,15 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.DB.ConnectTimeout != 5*time.Second {
 		t.Errorf("DB.ConnectTimeout = %v, want %v", cfg.DB.ConnectTimeout, 5*time.Second)
 	}
+	if cfg.Auth.JWTSecret != devJWTSecret {
+		t.Errorf("Auth.JWTSecret = %q, want the default dev secret", cfg.Auth.JWTSecret)
+	}
+	if cfg.Auth.AccessTokenTTL != 15*time.Minute {
+		t.Errorf("Auth.AccessTokenTTL = %v, want %v", cfg.Auth.AccessTokenTTL, 15*time.Minute)
+	}
+	if cfg.Auth.RefreshTokenTTL != 720*time.Hour {
+		t.Errorf("Auth.RefreshTokenTTL = %v, want %v", cfg.Auth.RefreshTokenTTL, 720*time.Hour)
+	}
 }
 
 func TestLoadEnvOverrides(t *testing.T) {
@@ -84,6 +93,9 @@ func TestLoadEnvOverrides(t *testing.T) {
 	t.Setenv("DB_MAX_CONN_LIFETIME", "1h")
 	t.Setenv("DB_MAX_CONN_IDLE_TIME", "10m")
 	t.Setenv("DB_CONNECT_TIMEOUT", "2s")
+	t.Setenv("AUTH_JWT_SECRET", "a-properly-random-32-plus-char-secret-for-tests")
+	t.Setenv("AUTH_ACCESS_TOKEN_TTL", "5m")
+	t.Setenv("AUTH_REFRESH_TOKEN_TTL", "1h")
 
 	cfg, err := Load()
 	if err != nil {
@@ -143,6 +155,15 @@ func TestLoadEnvOverrides(t *testing.T) {
 	}
 	if cfg.DB.ConnectTimeout != 2*time.Second {
 		t.Errorf("DB.ConnectTimeout = %v, want %v", cfg.DB.ConnectTimeout, 2*time.Second)
+	}
+	if cfg.Auth.JWTSecret != "a-properly-random-32-plus-char-secret-for-tests" {
+		t.Errorf("Auth.JWTSecret = %q, want the overridden secret", cfg.Auth.JWTSecret)
+	}
+	if cfg.Auth.AccessTokenTTL != 5*time.Minute {
+		t.Errorf("Auth.AccessTokenTTL = %v, want %v", cfg.Auth.AccessTokenTTL, 5*time.Minute)
+	}
+	if cfg.Auth.RefreshTokenTTL != 1*time.Hour {
+		t.Errorf("Auth.RefreshTokenTTL = %v, want %v", cfg.Auth.RefreshTokenTTL, 1*time.Hour)
 	}
 }
 
@@ -243,6 +264,11 @@ func TestConfigValidate(t *testing.T) {
 				MaxConnIdleTime: 5 * time.Minute,
 				ConnectTimeout:  5 * time.Second,
 			},
+			Auth: AuthConfig{
+				JWTSecret:       "a-properly-random-32-plus-char-secret-for-tests",
+				AccessTokenTTL:  15 * time.Minute,
+				RefreshTokenTTL: 720 * time.Hour,
+			},
 		}
 	}
 
@@ -330,6 +356,29 @@ func TestConfigValidate(t *testing.T) {
 			name:    "zero connect timeout",
 			mutate:  func(c *Config) { c.DB.ConnectTimeout = 0 },
 			wantErr: "DB_CONNECT_TIMEOUT",
+		},
+		{
+			name:    "short jwt secret",
+			mutate:  func(c *Config) { c.Auth.JWTSecret = "too-short" },
+			wantErr: "AUTH_JWT_SECRET",
+		},
+		{
+			name: "dev jwt secret in production",
+			mutate: func(c *Config) {
+				c.App.Environment = "production"
+				c.Auth.JWTSecret = devJWTSecret
+			},
+			wantErr: "AUTH_JWT_SECRET",
+		},
+		{
+			name:    "zero access token ttl",
+			mutate:  func(c *Config) { c.Auth.AccessTokenTTL = 0 },
+			wantErr: "AUTH_ACCESS_TOKEN_TTL",
+		},
+		{
+			name:    "refresh ttl not greater than access ttl",
+			mutate:  func(c *Config) { c.Auth.RefreshTokenTTL = c.Auth.AccessTokenTTL },
+			wantErr: "AUTH_REFRESH_TOKEN_TTL",
 		},
 	}
 

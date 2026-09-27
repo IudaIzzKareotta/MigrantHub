@@ -24,7 +24,7 @@ type User struct {
 }
 
 func New(email, displayName string) (*User, error) {
-	email = normalizeEmail(email)
+	email = NormalizeEmail(email)
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, ErrInvalidEmail
 	}
@@ -50,6 +50,6 @@ func New(email, displayName string) (*User, error) {
 	}, nil
 }
 
-func normalizeEmail(email string) string {
+func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }

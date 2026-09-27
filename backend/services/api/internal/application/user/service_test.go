@@ -37,6 +37,15 @@ func (f *fakeRepository) GetByID(ctx context.Context, id uuid.UUID) (*domainuser
 	return u, nil
 }
 
+func (f *fakeRepository) GetByEmail(ctx context.Context, email string) (*domainuser.User, error) {
+	for _, u := range f.byID {
+		if u.Email == email {
+			return u, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
 func TestServiceRegister(t *testing.T) {
 	repo := newFakeRepository()
 	svc := NewService(repo)

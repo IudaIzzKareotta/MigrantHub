@@ -63,3 +63,24 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domainuser
 
 	return &u, nil
 }
+
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domainuser.User, error) {
+	const query = `
+		SELECT id, email, display_name, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+
+	db := dbtxFromContext(ctx, r.pool)
+
+	var u domainuser.User
+	err := db.QueryRow(ctx, query, email).Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appuser.ErrNotFound
+		}
+		return nil, fmt.Errorf("select user by email: %w", err)
+	}
+
+	return &u, nil
+}
